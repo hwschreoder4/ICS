@@ -30,3 +30,23 @@
 *.exe
 *.out
 *.app
+
+# Arduino / PlatformIO build folders
+*.build/
+*.pio/
+*.arduinoIDE/
+
+# Compiled output
+*.elf
+*.bin
+*.hex
+*.eep
+*.map
+
+# Arduino sketch metadata
+*.pde
+*.bak
+*.tmp
+
+# Vendor-libraries folder (if you’re vendoring your own libraries)
+libraries/
