@@ -11,7 +11,7 @@ void setup() {
   delay(500);
   AudioToolsLogger.begin(Serial, AudioToolsLogLevel::Warning);
 
-  if (!RTPOut.begin(5006, /*WS*/33, /*BCK*/12, /*DATA*/37, 0.5f)) {
+  if (!RTPOut.begin(5006, /*WS*/33, /*BCK*/12, /*DATA*/22, 0.5f)) {
     Serial.println("RTPOutput init failed");
     while (true) delay(100);
   }
