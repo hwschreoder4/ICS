@@ -1,3 +1,6 @@
+#include <AudioLogger.h>
+#include <AudioTools.h>
+#include <AudioToolsConfig.h>
 
 /*
  * PlaybackViaSD.ino
@@ -9,91 +12,56 @@
 
  */
 
-
 #pragma once
+#include <AudioLogger.h>
+#include <AudioTools.h>
+#include <AudioToolsConfig.h>
 #include <SPI.h>
 #include <SD.h>
-#include <AudioLogger.h>
-#include <AudioToolsConfig.h>
 #include "AudioTools.h"
-#include "AudioTools/AudioCodecs/CodecWAV.h"
+#include "AudioTools/AudioCodecs/CodecMP3Helix.h"
 
-using namespace audio_tools;
+const int chipSelect=4;
+I2SStream i2s; // final output of decoded stream
+VolumeStream volume(i2s);
+EncodedAudioStream decoder(&volume, new MP3DecoderHelix()); // Decoding stream
+StreamCopy copier; 
+File audioFile;
 
-#define SD_CS_PIN 4    //A5 is GPIO 4...
-#define SD_SCK_PIN 5   // Serial Clock
-#define SD_MOSI_PIN 19 // Master Out, Slave In
-#define SD_MISO_PIN 21 // Master In, Slave Out
-#define WAV_FILENAME "/swing.wav"
-
-// SPI instance for SD (HSPI)
-SPIClass sdSpi(HSPI);
-
-// Audio formats
-const AudioInfo pcmMono(8000, 1, 16);    // WAV is 8kHz, mono, 16-bit
-const AudioInfo pcmStereo(8000, 2, 16);  // convert to stereo for I2S
-
-// I2S output and volume
-I2SStream i2sOut;
-VolumeStream volume(i2sOut);
-
-// WAV reader and converter
-EncodedAudioStream* wavStream;
-FormatConverterStream* monoToStereo;
-StreamCopy* playCopy;
-
-void setup() {
+void setup(){
   Serial.begin(115200);
+  AudioToolsLogger.begin(Serial, AudioToolsLogLevel::Error);  
 
-  // SD Init
-  sdSpi.begin(SD_SCK_PIN, SD_MISO_PIN, SD_MOSI_PIN, SD_CS_PIN);
-  if (!SD.begin(SD_CS_PIN, sdSpi)) {
-    Serial.println("[SD] initialization failed!");
-    while (true) delay(10);
-  }
-  if (!SD.exists(WAV_FILENAME)) {
-    Serial.print("[SD] File not found: ");
-    Serial.println(WAV_FILENAME);
-    while (true) delay(10);
-  }
+  // setup file
+  SD.begin(chipSelect);
+  audioFile = SD.open("/Swing Swing.mp3");
 
-  // Open and Decode WAV
-  File wavFile = SD.open(WAV_FILENAME, FILE_READ);
-  wavStream = new EncodedAudioStream(&wavFile, new WAVDecoder());
+  // setup i2s
+  auto config = i2s.defaultConfig(TX_MODE);
+  config.pin_ws = 33;
+  config.pin_bck = 12;
+  config.pin_data = 22;
+  config.buffer_size = 640;
+  config.buffer_count = 40;
+  i2s.begin(config);
 
-  // Mono ->Stero convertor
-  monoToStereo = new FormatConverterStream(*wavStream);
-  if (!monoToStereo->begin(pcmMono, pcmStereo)) {
-    Serial.println("[Conv] begin failed");
-    while (true) delay(10);
-  }
+  // setup I2S based on sampling rate provided by decoder
+  decoder.begin();
 
-  // I2S config 
-  auto cfg = i2sOut.defaultConfig(TX_MODE);
-  cfg.copyFrom(pcmStereo);
-  cfg.pin_ws   = 33;
-  cfg.pin_bck  = 12;
-  cfg.pin_data = 22;
-  if (!i2sOut.begin(cfg)) {
-    Serial.println("[I2S] begin failed");
-    while (true) delay(10);
-  }
+  // set up volume control
 
-  // Volume Init
   auto vcfg = volume.defaultConfig();
-  vcfg.copyFrom(pcmStereo);
+  vcfg.copyFrom(config);
   volume.begin(vcfg);
   volume.setVolume(0.5);
 
-  playCopy = new StreamCopy(volume, *monoToStereo);
-  playCopy->begin();
+  // begin copy
+  copier.begin(decoder, audioFile);
 
-  Serial.println("[SD] Starting WAV playback...");
 }
 
-void loop() {
-  if (monoToStereo->available() > 0) {
-    playCopy->copy();  // pushes STEREO_FRAME_BYTES to I2S
-  }
-  // once EOF, available() will be 0: playback stops
+void loop(){
+
+  if (!copier.copy()) {
+    stop();}
 }
