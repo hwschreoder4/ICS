@@ -1,7 +1,3 @@
-#include <AudioLogger.h>
-#include <AudioTools.h>
-#include <AudioToolsConfig.h>
-
 /*
  * PlaybackViaSD.ino
  * Based on work by Phil Schatzmann (https://github.com/pschatzmann/arduino-audio-tools)
