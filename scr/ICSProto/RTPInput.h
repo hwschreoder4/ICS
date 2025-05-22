@@ -79,6 +79,8 @@ public:
       Serial.println("[RTPInput] Error: UDPStream.begin() failed");
       return false;
     }
+    Serial.printf("[RTPInput] UDPStream.begin() succeeded to %s:%u\n", dest.toString().c_str(), port);
+    
     // 2) (optional) send three HELLO datagrams
     for (int i = 0; i < 3; ++i) {
       const char* hello = "HELLO";

@@ -15,8 +15,8 @@ const uint16_t SIP_PORT        = 5060;
 const uint16_t CONFERENCE_EXT  = 7001;
 
 // -- RTP media ports and I2S pins --
-const uint16_t RTP_SEND_PORT   = 5006;  // for conference audio transmit
-const uint16_t RTP_RECV_PORT   = 5004;  // for conference audio receive
+const uint16_t RTP_SEND_PORT   = 5004;  // for conference audio transmit
+const uint16_t RTP_RECV_PORT   = 5006;  // for conference audio receive
 const int PIN_WS_OUT   = 33;
 const int PIN_BCK_OUT  = 12;
 const int PIN_DATA_OUT = 22;
@@ -63,28 +63,29 @@ void loop() {
 
   // Once the 200 OK has arrived (isInCall), start RTP exactly once
   if (callLaunched && !rtpStarted && sipClient.isInCall()) {
-    Serial.println("→ Call established, starting RTP");
+    uint16_t mediaPort = sipClient.getRtpPort();
+    Serial.printf("Starting RTP to port %u\n", mediaPort);
 
-    // Transmit pipeline
-    if (!rtpOut.begin(RTP_RECV_PORT, PIN_WS_OUT, PIN_BCK_OUT, PIN_DATA_OUT, 0.8f)) {
-      Serial.println("RTPOutput init failed");
-      while (true) delay(100);
-    }
-    Serial.println("RTPOutput ready");
-
-    // Receive pipeline
-    if (!rtpIn.begin(WiFi.localIP(), RTP_SEND_PORT, PIN_WS_IN, PIN_BCK_IN, PIN_DATA_IN)) {
+    // Transmitt pipeline
+    if (!rtpIn.begin(SIP_SERVER, mediaPort, PIN_WS_IN, PIN_BCK_IN, PIN_DATA_IN)) {
       Serial.println("RTPInput init failed");
       while (true) delay(100);
     }
     Serial.println("RTPInput ready");
+
+        // Recive pipeline
+    //if (!rtpOut.begin(RTP_RECV_PORT, PIN_WS_OUT, PIN_BCK_OUT, PIN_DATA_OUT, 0.8f)) {
+    //  Serial.println("RTPOutput init failed");
+    //  while (true) delay(100);
+    //}
+    Serial.println("RTPOutput ready");
 
     rtpStarted = true;
   }
 
   // 3) Once RTP is started, keep pumping audio at full speed
   if (rtpStarted) {
-    rtpOut.update();
+    //rtpOut.update();
     rtpIn.update();
   }
 }

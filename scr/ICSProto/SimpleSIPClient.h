@@ -85,6 +85,9 @@ public:
     return reg;
   }
 
+  uint16_t getRtpPort() const {return _sip.GetRemoteRtpPort();}
+
+
 private:
   const char* _ssid;
   const char* _wifiPass;
