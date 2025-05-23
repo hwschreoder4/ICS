@@ -12,11 +12,11 @@ const char* SIP_USER      = "1008";
 const char* SIP_PASS      = "1008esp32";
 const char* SIP_SERVER    = "10.0.0.33";
 const uint16_t SIP_PORT        = 5060;
+const uint16_t LOCAL_SIP_PORT        = 5060;
 const uint16_t CONFERENCE_EXT  = 7001;
 
 // -- RTP media ports and I2S pins --
-const uint16_t RTP_SEND_PORT   = 5004;  // for conference audio transmit
-const uint16_t RTP_RECV_PORT   = 5006;  // for conference audio receive
+const uint16_t RTP_RECV_PORT   = 5004;  // for conference audio receive
 const int PIN_WS_OUT   = 33;
 const int PIN_BCK_OUT  = 12;
 const int PIN_DATA_OUT = 22;
@@ -30,7 +30,7 @@ const unsigned long SIP_MS  = 100;
 bool callLaunched           = false;
 bool rtpStarted             = false;
 
-SimpleSIPClient sipClient(WIFI_SSID, WIFI_PASSWORD, SIP_USER, SIP_PASS, SIP_SERVER, SIP_PORT, RTP_RECV_PORT);
+SimpleSIPClient sipClient(WIFI_SSID, WIFI_PASSWORD, SIP_USER, SIP_PASS, SIP_SERVER, SIP_PORT, LOCAL_SIP_PORT);
 RTPOutput       rtpOut(WIFI_SSID, WIFI_PASSWORD);
 RTPInput        rtpIn(WIFI_SSID, WIFI_PASSWORD);
 
@@ -48,7 +48,7 @@ void setup() {
   }
   Serial.println("SIP client init OK");
   Serial.println("→ Sending conference INVITE");
-  sipClient.callConference(CONFERENCE_EXT, RTP_SEND_PORT);
+  sipClient.callConference(CONFERENCE_EXT, RTP_RECV_PORT);
   callLaunched = true;
 }
 
@@ -73,11 +73,11 @@ void loop() {
     }
     Serial.println("RTPInput ready");
 
-        // Recive pipeline
-    //if (!rtpOut.begin(RTP_RECV_PORT, PIN_WS_OUT, PIN_BCK_OUT, PIN_DATA_OUT, 0.8f)) {
-    //  Serial.println("RTPOutput init failed");
-    //  while (true) delay(100);
-    //}
+      // Recive pipeline
+    if (!rtpOut.begin(RTP_RECV_PORT, PIN_WS_OUT, PIN_BCK_OUT, PIN_DATA_OUT, 0.8f)) {
+      Serial.println("RTPOutput init failed");
+      while (true) delay(100);
+    }
     Serial.println("RTPOutput ready");
 
     rtpStarted = true;
@@ -85,7 +85,7 @@ void loop() {
 
   // 3) Once RTP is started, keep pumping audio at full speed
   if (rtpStarted) {
-    //rtpOut.update();
-    rtpIn.update();
+    rtpOut.update();  // Drives RTP to Amp Output
+    rtpIn.update();   // Drives Mic Input to RTP
   }
 }

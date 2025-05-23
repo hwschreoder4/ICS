@@ -95,7 +95,7 @@ public:
 
   void update() {
     size_t sent = _sender->copy();
-    Serial.printf("[RTPInput] Sent %u RTP bytes\n", sent);
+    //Serial.printf("[RTPInput] Sent %u RTP bytes\n", sent);
   }
 
 private:

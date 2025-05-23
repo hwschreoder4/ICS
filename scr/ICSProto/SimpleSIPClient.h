@@ -60,7 +60,7 @@ public:
     _sip.Processing(inBuf, sizeof(inBuf));
   }
 
-  bool callConference(uint16_t conferenceExt, uint16_t mediaPort) {
+  bool callConference(uint16_t conferenceExt, uint16_t localRTPPort) {
     snprintf(_extBuf, sizeof(_extBuf), "%u", (unsigned)conferenceExt);
     _pendingSdp =
       String(F("v=0\r\n")) +
@@ -68,7 +68,7 @@ public:
       "s=ESP32 SIP Call\r\n" +
       "c=IN IP4 " + WiFi.localIP().toString() + "\r\n" +
       "t=0 0\r\n" +
-      "m=audio " + String(mediaPort) + " RTP/AVP 0\r\n" +
+      "m=audio " + String(localRTPPort) + " RTP/AVP 0\r\n" +
       "a=rtpmap:0 PCMU/8000\r\n";
 
     // this will drive the 401/ack/invite dance under the covers

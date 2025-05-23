@@ -64,6 +64,7 @@ bool begin(uint16_t port,
     cfg.pin_ws   = pin_ws;
     cfg.pin_bck  = pin_bck;
     cfg.pin_data = pin_data;
+    cfg.port_no  = I2S_NUM_1;
     cfg.buffer_size  = STEREO_FRAME_BYTES;
     cfg.buffer_count = 40;
     if (!_i2sOut->begin(cfg)) {

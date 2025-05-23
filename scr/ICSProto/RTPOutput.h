@@ -40,6 +40,7 @@ public:
 bool begin(uint16_t port,
              int pin_ws, int pin_bck, int pin_data,
              float volumeLevel = 0.5f) {
+    Serial.printf("[RTPOutput] begin(): port=%u ws=%d bck=%d data=%d vol=%.2f\n", port, pin_ws, pin_bck, pin_data, volumeLevel);
     // Instantiate pipeline components
     _udpStream    = new UDPStream(_ssid, _password);
     _rtp          = new RTPOverUDP(*_udpStream);
@@ -89,6 +90,7 @@ bool begin(uint16_t port,
       Serial.println("[RTPOutput]Error: toStero Convertor begin failed");
       return false;
     }
+    Serial.println("[RTPOutput] FormatConverter begin OK");
     // Pre-fill jitter buffer
     while (_jitterBuffer->available() < MONO_FRAME_BYTES *12) {
       _bufCopy->copy(); // pump in 12×20 ms = 240 ms of audio
@@ -113,13 +115,13 @@ bool begin(uint16_t port,
     }
     _player->copy();
 
-    unsigned long now = millis();
-    if (now - _lastLog > 5000) {
-      Serial.printf("Underflows: %d, Buffer: %u bytes\n",
-                    _underflows, _jitterBuffer->available());
-      _underflows = 0;
-      _lastLog = now;
-    }
+    //unsigned long now = millis();
+    //if (now - _lastLog > 5000) {
+    //  Serial.printf("Underflows: %d, Buffer: %u bytes\n",
+    //                _underflows, _jitterBuffer->available());
+    //  _underflows = 0;
+    //  _lastLog = now;
+    //}
   }
 
 private:
