@@ -3,11 +3,11 @@
 #include "RTPInput.h"
 #include "RTPOutput.h"
 
-// -- Wi-Fi credentials (used inside SimpleSIPClient::begin) --
+// Wi-Fi credentials (used inside SimpleSIPClient::begin)
 const char* WIFI_SSID     = "Good's Wifi 2.4";
 const char* WIFI_PASSWORD = "Class#1956";
 
-// -- SIP credentials and server --
+// SIP credentials and server
 const char* SIP_USER      = "1008";
 const char* SIP_PASS      = "1008esp32";
 const char* SIP_SERVER    = "10.0.0.33";
@@ -15,7 +15,7 @@ const uint16_t SIP_PORT        = 5060;
 const uint16_t LOCAL_SIP_PORT        = 5060;
 const uint16_t CONFERENCE_EXT  = 7001;
 
-// -- RTP media ports and I2S pins --
+// RTP media ports and I2S pins
 const uint16_t RTP_RECV_PORT   = 5004;  // for conference audio receive
 const int PIN_WS_OUT   = 33;
 const int PIN_BCK_OUT  = 12;
@@ -24,7 +24,7 @@ const int PIN_WS_IN    = 15;
 const int PIN_BCK_IN   = 14;
 const int PIN_DATA_IN  = 32;
 
-// -- Tracking for SIP
+// Tracking for SIP
 unsigned long lastSipTick   = 0;
 const unsigned long SIP_MS  = 100;
 bool callLaunched           = false;
@@ -83,9 +83,9 @@ void loop() {
     rtpStarted = true;
   }
 
-  // 3) Once RTP is started, keep pumping audio at full speed
+  // Once RTP is started, keep pumping audio at full speed
   if (rtpStarted) {
     rtpOut.update();  // Drives RTP to Amp Output
-    rtpIn.update();   // Drives Mic Input to RTP
+    //rtpIn.update();   // Drives Mic Input to RTP
   }
 }

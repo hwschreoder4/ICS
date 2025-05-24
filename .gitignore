@@ -50,3 +50,4 @@
 
 # Vendor-libraries folder (if you’re vendoring your own libraries)
 libraries/
+*.h
