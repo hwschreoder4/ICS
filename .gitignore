@@ -50,4 +50,8 @@
 
 # Vendor-libraries folder (if you’re vendoring your own libraries)
 libraries/
-*.h
+
+# EXCEPT these folders:
+!src/**/*.h
+!src/libraries/ArduinoSIP/**/*.h
+
