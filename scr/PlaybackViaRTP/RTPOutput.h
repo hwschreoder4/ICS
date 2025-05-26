@@ -143,5 +143,5 @@ private:
   static const size_t JITTER_BUF_SIZE    = 160 * 2 * 2 * 30;
 
   AudioInfo _pcmMono   {8000, 1, 16};
-  AudioInfo _pcmStereo {8000, 2, 16};
+  AudioInfo _pcmStereo {8000, 1, 16};
 };

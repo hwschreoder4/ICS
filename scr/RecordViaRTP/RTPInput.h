@@ -16,6 +16,7 @@
 #include "AudioTools/AudioCodecs/CodecG7xx.h"
 #include "AudioTools/CoreAudio/Buffers.h"
 #include "OffsetFilter.h"
+#include "AudioTools/CoreAudio/AudioFilter/Filter.h"
 
 using namespace audio_tools;
 
@@ -29,7 +30,11 @@ public:
     , _i2sIn(nullptr)
     , _offsetFilter(nullptr)
     , _dcCorrect(nullptr)
-    , _toNet(nullptr)
+    , _highPass(nullptr)
+    , _filteredHP(nullptr)
+    , _lowPass(nullptr)
+    , _filteredLP(nullptr)
+   //, _toNet(nullptr)
     , _encoder(nullptr)
     , _sender(nullptr) {}
 
@@ -40,7 +45,10 @@ public:
     _i2sIn        = new I2SStream();
     _offsetFilter = new OffsetFilter();
     _dcCorrect    = new FilteredStream<int32_t, int32_t>(*_i2sIn, 1);
-    _toNet        = new FormatConverterStream(*_dcCorrect);
+    auto sampleRate = _pcmIn.sample_rate;  
+    _highPass     = new HighPassFilter<long>(300.0f, sampleRate, 0.7f);
+    _lowPass      = new LowPassFilter<long>(3400.0f, sampleRate, 0.7f);
+    //_toNet        = new FormatConverterStream(*_dcCorrect);
     _encoder      = new EncodedAudioStream(_rtp, new G711_ULAWEncoder());
     _sender       = new StreamCopy(*_encoder, *_toNet);
     _dest         = dest;
@@ -66,10 +74,27 @@ public:
       Serial.println("[RTPInput] Error: dcCorrect begin failed");
       return false;
     }
-    if (!_toNet->begin(_pcmIn, _pcmNet)) {
-      Serial.println("[RTPInput] Error: toNet begin failed");
+
+    // High-pass filter stream
+    _filteredHP = new FilteredStream<int32_t,int32_t>(* _dcCorrect, 1);
+    _filteredHP->setFilter(0, _highPass);
+    if (!_filteredHP->begin(_pcmIn)) {
+      Serial.println("[RTPInput] Error: filteredHP begin failed");
       return false;
     }
+
+    // Low-pass filter stream
+    _filteredLP = new FilteredStream<int32_t,int32_t>(* _filteredHP, 1);
+    _filteredLP->setFilter(0, _lowPass);
+    if (!_filteredLP->begin(_pcmIn)) {
+      Serial.println("[RTPInput] Error: filteredLP begin failed");
+      return false;
+    }
+
+    //if (!_toNet->begin(_pcmIn, _pcmNet)) {
+    //  Serial.println("[RTPInput] Error: toNet begin failed");
+    //  return false;
+    //}
     if (!_encoder->begin(_pcmNet)) {
       Serial.println("[RTPInput] Error: Encoder begin failed");
       return false;
@@ -105,11 +130,15 @@ private:
   I2SStream*                        _i2sIn;
   OffsetFilter*                     _offsetFilter;
   FilteredStream<int32_t, int32_t>* _dcCorrect;
-  FormatConverterStream*            _toNet;
+  HighPassFilter<long>*                   _highPass;
+  FilteredStream<int32_t,int32_t>*  _filteredHP;
+  LowPassFilter<long>*                    _lowPass;
+  FilteredStream<int32_t,int32_t>*  _filteredLP;
+  //FormatConverterStream*            _toNet;
   EncodedAudioStream*               _encoder;
   StreamCopy*                       _sender;
 
 
-  AudioInfo _pcmIn{44100, 1, 32};
+  AudioInfo _pcmIn{8000, 1, 16};
   AudioInfo _pcmNet{8000, 1, 16};
 };
