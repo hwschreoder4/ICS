@@ -36,10 +36,10 @@ SimpleSIPClient sipClient(WIFI_SSID, WIFI_PASSWORD, SIP_USER, SIP_PASS, SIP_SERV
 RTPOutput       rtpOut(WIFI_SSID, WIFI_PASSWORD);
 RTPInput        rtpIn(WIFI_SSID, WIFI_PASSWORD);
 
-static void rtpOutputTask(void* pv) {
+static void rtpInputTask(void* pv) {
   // this task will live on core 0
   for(;;) {
-    rtpOut.update();
+    rtpIn.update();
     // give other tasks a chance; tune the delay as needed
     vTaskDelay(pdMS_TO_TICKS(1));
   }
@@ -76,8 +76,8 @@ void setup() {
    // once rtpStarted is true, spin up the pinned task:
   if (callLaunched && !rtpStarted && sipClient.isInCall()) {
     xTaskCreatePinnedToCore(
-      rtpOutputTask,      // function
-      "RTPOutTask",       // name
+      rtpInputTask,      // function
+      "RTPInTask",       // name
       4096,              // stack size (bytes)
       nullptr,           // parameter
       1,                 // priority (1 is low; audio may need higher)
@@ -99,6 +99,6 @@ void loop() {
 
   // Once RTP is started, keep pumping audio at full speed
   if (rtpStarted) {
-    rtpIn.update();  // Drives RTP to Amp Output
+    rtpOut.update();  // Drives RTP to Amp Output
   }
 }

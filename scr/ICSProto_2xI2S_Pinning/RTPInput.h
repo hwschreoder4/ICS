@@ -16,8 +16,6 @@
 #include "AudioTools/AudioCodecs/CodecG7xx.h"
 #include "AudioTools/CoreAudio/Buffers.h"
 #include "OffsetFilter.h"
-//#include "AudioTools/CoreAudio/AudioFilter/MedianFilter.h"
-//#include "AudioTools/CoreAudio/AudioFilter/Filter.h"
 
 using namespace audio_tools;
 
@@ -30,8 +28,6 @@ public:
     , _rtp(nullptr)
     , _i2sIn(nullptr)
     , _offsetFilter(nullptr)
-    //, _filterChain(nullptr)
-    //, _medianFilter(nullptr)
     , _dcCorrect(nullptr)
     , _toNet(nullptr)
     , _encoder(nullptr)
@@ -43,7 +39,6 @@ public:
     _rtp          = new RTPOverUDP(*_udpStream);
     _i2sIn        = new I2SStream();
     _offsetFilter = new OffsetFilter();
-    //_medianFilter = new MedianFilter<int32_t>(4);
     _dcCorrect    = new FilteredStream<int32_t, int32_t>(*_i2sIn, 1);
     _toNet        = new FormatConverterStream(*_dcCorrect);
     _encoder      = new EncodedAudioStream(_rtp, new G711_ULAWEncoder());
@@ -66,10 +61,8 @@ public:
       return false;
     }
 
-    // Build filters and converters. Median Filter added to chain to reduce popping
-    //Filter<int32_t>* filters[2] = {_offsetFilter, _medianFilter};
-    //_filterChain = new FilterChain<int32_t,2>(std::move(filters));
-    _dcCorrect->setFilter(0, _offsetFilter);  
+    // Build filters and converters
+    _dcCorrect->setFilter(0, _offsetFilter);
     if (!_dcCorrect->begin(_pcmIn)) {
       Serial.println("[RTPInput] Error: dcCorrect begin failed");
       return false;
@@ -114,14 +107,12 @@ private:
   RTPOverUDP*                       _rtp;
   I2SStream*                        _i2sIn;
   OffsetFilter*                     _offsetFilter;
-  //MedianFilter<int32_t>*            _medianFilter;
   FilteredStream<int32_t, int32_t>* _dcCorrect;
-  //FilterChain<int32_t,2>*            _filterChain;
   FormatConverterStream*            _toNet;
   EncodedAudioStream*               _encoder;
   StreamCopy*                       _sender;
 
 
-  AudioInfo _pcmIn{16000, 1, 16};
+  AudioInfo _pcmIn{16000, 1, 32};
   AudioInfo _pcmNet{8000, 1, 16};
 };
