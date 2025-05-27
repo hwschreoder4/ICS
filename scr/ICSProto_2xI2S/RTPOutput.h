@@ -17,6 +17,7 @@
 #include "RTPOverUDP.h"
 #include "AudioTools/AudioCodecs/CodecG7xx.h"
 #include "AudioTools/CoreAudio/Buffers.h"
+#include "esp_sleep.h"
 
 using namespace audio_tools;
 
@@ -32,10 +33,7 @@ public:
     , _jitterBuffer(nullptr)
     , _decoder(nullptr)
     , _bufCopy(nullptr)
-    , _toStereo(nullptr)
-    , _player(nullptr)
-    , _underflows(0)
-    , _lastLog(0) {}
+    , _player(nullptr) {}
 
 bool begin(uint16_t port,
              int pin_ws, int pin_bck, int pin_data,
@@ -49,8 +47,7 @@ bool begin(uint16_t port,
     _jitterBuffer = new RingBufferStream(JITTER_BUF_SIZE);
     _decoder      = new EncodedAudioStream(_rtp, new G711_ULAWDecoder());
     _bufCopy      = new StreamCopy(*_jitterBuffer, *_decoder);
-    _toStereo     = new FormatConverterStream(*_jitterBuffer);
-    _player       = new StreamCopy(*_volume, *_toStereo);
+    _player       = new StreamCopy(*_volume, *_jitterBuffer);
 
     // Begin UDP stream
     if (!_udpStream->begin(port)) {
@@ -61,14 +58,14 @@ bool begin(uint16_t port,
     // Configure I2S output
     Serial.println("[RTPOutput]Configuring I2S output...");
     auto cfg = _i2sOut->defaultConfig(TX_MODE);
-    cfg.copyFrom(_pcmStereo);
+    cfg.copyFrom(_pcmMono);
     cfg.pin_ws   = pin_ws;
     cfg.pin_bck  = pin_bck;
     cfg.pin_data = pin_data;
     cfg.i2s_format = I2S_STD_FORMAT;
     cfg.port_no  = I2S_NUM_1;
     cfg.buffer_size  = 1024;
-    cfg.buffer_count = 12;
+    cfg.buffer_count = 15;
     if (!_i2sOut->begin(cfg)) {
       Serial.println("[RTPOutput]Error: I2SStream begin failed");
       return false;
@@ -81,15 +78,10 @@ bool begin(uint16_t port,
 
     // Configure volume control
     auto vcfg = _volume->defaultConfig();
-    vcfg.copyFrom(_pcmStereo);
+    vcfg.copyFrom(_pcmMono);
     _volume->begin(vcfg);
     _volume->setVolume(volumeLevel);
 
-    // Set up format conversion
-    if (!_toStereo->begin(_pcmMono, _pcmStereo)){
-      Serial.println("[RTPOutput]Error: toStero Convertor begin failed");
-      return false;
-    }
     Serial.println("[RTPOutput] FormatConverter begin OK");
     // Pre-fill jitter buffer
     while (_jitterBuffer->available() < MONO_FRAME_BYTES *5) {
@@ -101,7 +93,6 @@ bool begin(uint16_t port,
     // Begin playback
     _player->begin();
 
-    _lastLog = millis();
     return true;
   }
 
@@ -110,18 +101,11 @@ bool begin(uint16_t port,
     while (_jitterBuffer->availableForWrite() >= MONO_FRAME_BYTES && _jitterBuffer->available() < REFILL_THRESHOLD) {
       _bufCopy->copy();
     }
-    if (_jitterBuffer->available() < MONO_FRAME_BYTES) {
-      _underflows++;
-    }
     _player->copy();
+  }
 
-    //unsigned long now = millis();
-    //if (now - _lastLog > 5000) {
-    //  Serial.printf("Underflows: %d, Buffer: %u bytes\n",
-    //                _underflows, _jitterBuffer->available());
-    //  _underflows = 0;
-    //  _lastLog = now;
-    //}
+  void setAmpGain(float g){
+    _volume->setVolume(constrain(g, 0.0f, 1.0f));
   }
 
 private:
@@ -134,17 +118,12 @@ private:
   RingBufferStream* _jitterBuffer;
   EncodedAudioStream* _decoder;
   StreamCopy*      _bufCopy;
-  FormatConverterStream* _toStereo;
   StreamCopy*      _player;
-
-  int              _underflows;
-  unsigned long    _lastLog;
 
   static const size_t MONO_FRAME_BYTES   = 160 * 2;
   static const size_t STEREO_FRAME_BYTES = 160 * 2 * 2;
   static const size_t REFILL_THRESHOLD   = MONO_FRAME_BYTES * 2;
-  static const size_t JITTER_BUF_SIZE    = 160 * 2 * 2 * 30;
+  static const size_t JITTER_BUF_SIZE    = 160 * 2  * 15;
 
   AudioInfo _pcmMono   {8000, 1, 16};
-  AudioInfo _pcmStereo {8000, 2, 16};
 };

@@ -2,6 +2,8 @@
 #include "SimpleSIPClient.h"   // wrapper around ArduinoSIP :contentReference[oaicite:1]{index=1}
 #include "RTPInput.h"
 #include "RTPOutput.h"
+#include <freertos/FreeRTOS.h>
+#include <freertos/task.h>
 
 // Wi-Fi credentials (used inside SimpleSIPClient::begin)
 const char* WIFI_SSID     = "Good's Wifi 2.4";
@@ -34,6 +36,15 @@ SimpleSIPClient sipClient(WIFI_SSID, WIFI_PASSWORD, SIP_USER, SIP_PASS, SIP_SERV
 RTPOutput       rtpOut(WIFI_SSID, WIFI_PASSWORD);
 RTPInput        rtpIn(WIFI_SSID, WIFI_PASSWORD);
 
+static void rtpOutputTask(void* pv) {
+  // this task will live on core 0
+  for(;;) {
+    rtpOut.update();
+    // give other tasks a chance; tune the delay as needed
+    vTaskDelay(pdMS_TO_TICKS(1));
+  }
+}
+
 void setup() {
   Serial.begin(115200);
   delay(500);
@@ -50,42 +61,41 @@ void setup() {
   Serial.println("→ Sending conference INVITE");
   sipClient.callConference(CONFERENCE_EXT, RTP_RECV_PORT);
   callLaunched = true;
+  Serial.println("→ Waiting for call to be established…");
+  while (!sipClient.isInCall()) {
+    sipClient.loop();
+    delay(SIP_MS);           
+  }
+  uint16_t mediaPort = sipClient.getRtpPort();
+  Serial.printf("Starting RTP to port %u\n", mediaPort);
+
+    // Instantiate audio pipelines
+  rtpOut.begin(RTP_RECV_PORT, PIN_WS_OUT, PIN_BCK_OUT, PIN_DATA_OUT, 0.8f);
+  rtpIn.begin(SIP_SERVER, mediaPort, PIN_WS_IN, PIN_BCK_IN, PIN_DATA_IN);
+
+   // once rtpStarted is true, spin up the pinned task:
+  if (callLaunched && !rtpStarted && sipClient.isInCall()) {
+    xTaskCreatePinnedToCore(
+      rtpOutputTask,      // function
+      "RTPOutTask",       // name
+      4096,              // stack size (bytes)
+      nullptr,           // parameter
+      1,                 // priority (1 is low; audio may need higher)
+      nullptr,           // task handle (not used)
+      0                  // pin to core 0
+    );
+    rtpStarted = true;
+  }
 }
 
 void loop() {
-  unsigned long now = millis();
 
   // Throttle SIP processing so we don't flood
-  if (now - lastSipTick >= SIP_MS) {
+  if (millis() - lastSipTick >= SIP_MS) {
     sipClient.loop();
-    lastSipTick = now;
-  }
-
-  // Once the 200 OK has arrived (isInCall), start RTP exactly once
-  if (callLaunched && !rtpStarted && sipClient.isInCall()) {
-    uint16_t mediaPort = sipClient.getRtpPort();
-    Serial.printf("Starting RTP to port %u\n", mediaPort);
-
-    // Transmitt pipeline
-    if (!rtpIn.begin(SIP_SERVER, mediaPort, PIN_WS_IN, PIN_BCK_IN, PIN_DATA_IN)) {
-      Serial.println("RTPInput init failed");
-      while (true) delay(100);
-    }
-    Serial.println("RTPInput ready");
-
-      // Recive pipeline
-    if (!rtpOut.begin(RTP_RECV_PORT, PIN_WS_OUT, PIN_BCK_OUT, PIN_DATA_OUT, 0.8f)) {
-      Serial.println("RTPOutput init failed");
-      while (true) delay(100);
-    }
-    Serial.println("RTPOutput ready");
-
-    rtpStarted = true;
+    lastSipTick = millis();
   }
 
   // Once RTP is started, keep pumping audio at full speed
-  if (rtpStarted) {
-    rtpOut.update();  // Drives RTP to Amp Output
-    //rtpIn.update();   // Drives Mic Input to RTP
+  rtpIn.update();  // Drives RTP from mic
   }
-}
