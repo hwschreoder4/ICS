@@ -77,6 +77,84 @@ void Sip::Init(const char *SipIp, int SipPort, const char *MyIp, int MyPort, con
   iMaxTime = MaxDialSec * 1000;
 }
 
+bool Sip::Register(const char* challenge) {
+    // If authentication in progress, iAuthCnt > 0, a "401 Unauthorized" challenge first.
+    // Otherwise, this is the first REGISTER attempt.
+    char realm[128] = { 0 }, nonce[128] = { 0 }, opaque[128] = { 0 }, qop[32] = { 0 };
+    uint16_t cseq = (iAuthCnt == 0) ? 1 : (1 + iAuthCnt);
+
+    // Build the REGISTER request
+    pbuf[0] = '\0';
+    AddSipLine("REGISTER sip:%s SIP/2.0", pSipIp);                   // Request‐URI = server
+    AddSipLine("Via: SIP/2.0/UDP %s:%u;branch=%010u;rport=%u",      // Via: our IP:port
+        pMyIp, iMyPort, Random(), iMyPort);
+    AddSipLine("Max-Forwards: 70");
+    AddSipLine("From: <sip:%s@%s>;tag=%010u",                        // From: our user
+        pSipUser, pSipIp, Random());
+    AddSipLine("To: <sip:%s@%s>", pSipUser, pSipIp);                  // To: same as From
+    if (iAuthCnt == 0) { regid = Random(); }                          // Pick a random 32-bit regId; server to challenge
+    AddSipLine("Call-ID: %010u@%s", regid, pMyIp);
+    AddSipLine("CSeq: %u REGISTER", cseq);
+    AddSipLine("Contact: <sip:%s@%s:%u;transport=udp>",
+        pSipUser, pMyIp, iMyPort);
+    AddSipLine("User-Agent: arduino-sip/0.1");
+
+    // If iAuthCnt > 0, process challenge from 401
+    if (challenge != nullptr && iAuthCnt > 0) {
+        // Parse out realm, nonce, opaque, qop from the challenge text
+        bool ok = ParseParameter(realm, sizeof(realm), "realm=\"", challenge, '"') &&
+            ParseParameter(nonce, sizeof(nonce), "nonce=\"", challenge, '"') &&
+            ParseParameter(opaque, sizeof(opaque), "opaque=\"", challenge, '"') &&
+            ParseParameter(qop, sizeof(qop), "qop=\"", challenge, '"');
+        if (!ok) {
+            // Malformed challenge: give up
+            return false;
+        }
+        char nc[9], cnonce[17];                                     //Build nc and cnonce
+        snprintf(nc, sizeof(nc), "%08X", iAuthCnt + 1);
+        snprintf(cnonce, sizeof(cnonce), "%08X", (uint32_t)millis());
+
+        MD5Builder md5;                                             // HA1 = MD5(user:realm:pass)
+        md5.begin(); md5.add(pSipUser); md5.add(":"); md5.add(realm);
+        md5.add(":"); md5.add(pSipPassWd); md5.calculate();
+        char ha1[33]; strcpy(ha1, md5.toString().c_str());
+
+        // HA2 = MD5("REGISTER:sip:user@host")
+        md5.begin(); md5.add("REGISTER:sip:"); md5.add(pSipUser);
+        md5.add("@"); md5.add(pSipIp); md5.calculate();
+        char ha2[33]; strcpy(ha2, md5.toString().c_str());
+
+        // response = MD5(HA1:nonce:nc:cnonce:qop:HA2)
+        md5.begin();
+        md5.add(ha1); md5.add(":"); md5.add(nonce);
+        md5.add(":"); md5.add(nc);
+        md5.add(":"); md5.add(cnonce);
+        md5.add(":"); md5.add(qop);
+        md5.add(":"); md5.add(ha2);
+        md5.calculate();
+        char resp[33]; strcpy(resp, md5.toString().c_str());
+
+        // Add Authorization header
+        AddSipLine(
+            "Authorization: Digest username=\"%s\", realm=\"%s\", nonce=\"%s\", uri=\"sip:%s@%s\","
+            "response=\"%s\", algorithm=MD5, opaque=\"%s\", qop=\"%s\", nc=%s, cnonce=\"%s\"",
+            pSipUser, realm, nonce,
+            pSipUser, pSipIp,
+            resp, opaque, qop,
+            nc, cnonce
+        );
+        iAuthCnt++;
+    }
+    // End of headers. Content-Length = 0
+    AddSipLine("Expires: 3600");         // optional: tell server to keep registration 1 hour
+    AddSipLine("Content-Length: 0");
+    AddSipLine("");                      // blank line
+    SendUdp();
+
+    // Clear any previous challenge‐data so that new 401 will re‐populate it
+    caRead[0] = '\0';
+    return true;
+}
 
 bool Sip::Dial(const char *DialNr, const char *DialDesc, const char* sdpPtr, size_t sdpLength) {
   
@@ -123,12 +201,27 @@ void Sip::Processing(char* readBuf, size_t bufLen) {
 
 void Sip::HandleUdpPacket(const char *p) {
   
-  uint32_t iWorkTime = iRingTime ? (Millis() - iRingTime) : 0;
+    if (strstr(p, "OPTIONS sip:1009@")) {     // This reply to the keep alive needs to be at the top of the stack
+        ParseReturnParams(p);
+        // build minimal 200 response
+        pbuf[0] = '\0';
+        AddSipLine("SIP/2.0 200 OK");
+        AddCopySipLine(p, "Via: ");
+        AddCopySipLine(p, "To: ");
+        AddCopySipLine(p, "From: ");
+        AddCopySipLine(p, "Call-ID: ");
+        AddCopySipLine(p, "CSeq: ");
+        AddSipLine("Content-Length: 0");
+        AddSipLine("");
+        SendUdp();
+    }
+    
+    uint32_t iWorkTime = iRingTime ? (Millis() - iRingTime) : 0;
   
   if ( iRingTime && iWorkTime > iMaxTime )
   {
     // Cancel(3);
-    Bye(3);
+    //Bye(3);
     iRingTime = 0;
   }
 
@@ -145,32 +238,32 @@ void Sip::HandleUdpPacket(const char *p) {
     return;
   }
 
-  if (strncmp(p, "OPTIONS ", 8) == 0) {
-      ParseReturnParams(p);
-      // build minimal 200 response
-      pbuf[0] = 0;
-      AddSipLine("SIP/2.0 200 OK");
-      AddCopySipLine(p, "Via: ");
-      AddCopySipLine(p, "To: ");
-      AddCopySipLine(p, "From: ");
-      AddCopySipLine(p, "Call-ID: ");
-      AddCopySipLine(p, "CSeq: ");
-      AddSipLine("Content-Length: 0");
-      AddSipLine("");
-      SendUdp();
+
+  
+  if (strstr(p, "INVITE sip:100")) {       //Auto accept INVITE and move to that call
+      AnswerInvite(p);
+      /*if (isInCall) {
+          Bye(iLastCSeq);
+          isInCall = false;
+          iRingTime = 0;
+      } */
+      iLastCSeq = GrepInteger(p, "\nCSeq: ");
       return;
   }
 
   if ( strstr(p, "SIP/2.0 401 Unauthorized"))
   {
+      if (strstr(p, "CSeq:") && strstr(p, "REGISTER")) { Register(p); return; }
      //Serial.println(">>> Got 401 Unauthorized!");               // Serial Print Debug lines
      //Serial.println(">>> Challenge before Ack():");
      //Serial.println(p);
+      
      Ack(p);
      //Serial.println(">>> Challenge after Ack():");
      //Serial.println(p);
      // call Invite with response data (p) to build auth md5 hashes
      Invite(p);
+     return;
   }
 
   else if ( strstr(p, "SIP/2.0 200 OK") && strstr(p, "CSeq:"))		// OK
@@ -181,7 +274,7 @@ void Sip::HandleUdpPacket(const char *p) {
     remoteRtpPort = parseRemoteRtpPort(p);
     Serial.printf(">>> remoteRtpPort = %u\n", remoteRtpPort);
     Ack(p);
-
+    return;
   }
   else if (    strstr(p, "SIP/2.0 183 ") 	// Session Progress
             || strstr(p, "SIP/2.0 100 ")	// Trying
@@ -514,8 +607,53 @@ void Sip::Invite(const char* challenge) {
         memcpy(pbuf + used, sdpBody, toCp);
         pbuf[used + toCp] = '\0';
     }
+    SendUdp();
+    iLastCSeq = cseq;
+}
+
+//Helper function to allow Auto-Answer of invites
+void Sip::AnswerInvite(const char* inviteMsg) {
+    remoteRtpPort = parseRemoteRtpPort(inviteMsg);
+
+    // Building custom Invite resopnse
+    static char ourSdp[256];
+    snprintf(ourSdp, sizeof(ourSdp),
+        "v=0\r\n"
+        "o=- 0 0 IN IP4 %s\r\n"
+        "s=AutoAnswer\r\n"
+        "c=IN IP4 %s\r\n"
+        "t=0 0\r\n"
+        "m=audio 5004 RTP/AVP 0\r\n"
+        "a=rtpmap:0 PCMU/8000\r\n"
+        "a=recvonly\r\n",
+        pMyIp, pMyIp
+    );
+    char uri[64] = { 0 };
+    if (!ParseParameter(uri, sizeof(uri), "To: <", inviteMsg, '>')) {
+        return;
+    }
+    static char myToTag[32];
+    snprintf(myToTag, sizeof(myToTag), "%08X", (unsigned)rand());
+    int cseq = GrepInteger(inviteMsg, "\nCSeq: ");
+
+    // 200 OK response
+    pbuf[0] = '\0';
+    AddSipLine("SIP/2.0 200 OK");
+    AddCopySipLine(inviteMsg, "Via: ");
+    AddSipLine("To: <%s>;tag=%s", uri, myToTag);
+    AddCopySipLine(inviteMsg, "From: ");
+    AddCopySipLine(inviteMsg, "Call-ID: ");
+    AddSipLine("CSeq: %d INVITE", cseq);
+    AddSipLine("Contact: <sip:%s@%s:%u;transport=udp>", pSipUser, pMyIp, iMyPort);
+    AddSipLine("Content-Type: application/sdp");
+    AddSipLine("Content-Length: %u", (unsigned)strlen(ourSdp));
+    AddSipLine("");
+    AddSipLine("%s", ourSdp);
 
     SendUdp();
+
+    // Mark “in call,” so that your application will start RTP
+    isInCall = true;
 }
 
 

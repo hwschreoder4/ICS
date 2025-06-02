@@ -34,15 +34,15 @@ public:
     , _sender(nullptr) {}
 
   bool begin(const IPAddress& dest, uint16_t port, int pin_ws, int pin_bck, int pin_data) {
-    // Instantiate pipeline components
-    _udpStream    = new UDPStream(_ssid, _password);
-    _rtp          = new RTPOverUDP(*_udpStream);
+    // Instantiate pipeline componentsy
     _i2sIn        = new I2SStream();
     _offsetFilter = new OffsetFilter();
     _dcCorrect    = new FilteredStream<int32_t, int32_t>(*_i2sIn, 1);
     _toNet        = new FormatConverterStream(*_dcCorrect);
-    _encoder      = new EncodedAudioStream(_rtp, new G711_ULAWEncoder());
     _sender       = new StreamCopy(*_encoder, *_toNet);
+    _encoder      = new EncodedAudioStream(_rtp, new G711_ULAWEncoder());
+    _rtp          = new RTPOverUDP(*_udpStream);\
+    _udpStream    = new UDPStream(_ssid, _password);
     _dest         = dest;
     _port         = port;
 

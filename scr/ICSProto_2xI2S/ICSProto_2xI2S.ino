@@ -10,7 +10,7 @@ const char* WIFI_SSID     = "Good's Wifi 2.4";
 const char* WIFI_PASSWORD = "Class#1956";
 
 // SIP credentials and server
-const char* SIP_USER      = "1009";
+const char* SIP_USER      = "1009";        //1009 is the smaller battery. 1008 is the larger
 const char* SIP_PASS      = "1009esp32";
 const char* SIP_SERVER    = "10.0.0.33";
 const uint16_t SIP_PORT        = 5060;
@@ -28,7 +28,6 @@ const int PIN_VOL_UP   = 26;
 const int PIN_VOL_DOWN = 25;
 const int PIN_MUTE     = 27;
 const int PIN_GROUP    = 34;  //A2
-//const gpio_num_t PIN_SLEEP    = GPIO_NUM_39;   //A3
 
 // Tracking for SIP
 unsigned long lastSipTick   = 0;
@@ -64,11 +63,6 @@ void setup() {
   sipClient.callConference(userInput.readGroup(baseExt, groups), RTP_RECV_PORT);
   Serial.printf("Joining group %u\n", userInput.readGroup(baseExt, groups));
   callLaunched = true;
-
-  //Set up sleep
-  //pinMode(PIN_SLEEP, INPUT); 
-  //esp_sleep_enable_ext0_wakeup(PIN_SLEEP, 1); // wake on 3.3 V (HIGH)
-
 }
 
 void loop() {
@@ -93,7 +87,7 @@ void loop() {
     Serial.println("RTPInput ready");
 
       // Recive pipeline
-    if (!rtpOut.begin(RTP_RECV_PORT, PIN_WS_OUT, PIN_BCK_OUT, PIN_DATA_OUT, 0.8f)) {
+    if (!rtpOut.begin(RTP_RECV_PORT, PIN_WS_OUT, PIN_BCK_OUT, PIN_DATA_OUT, 1.0f)) {
       Serial.println("RTPOutput init failed");
       while (true) delay(100);
     }
@@ -117,13 +111,4 @@ void loop() {
       rtpIn.update();   // Drives Mic Input to RTP
     }
   }
-  /*
-  //Power down check with delay for long press
-  if (digitalRead(PIN_SLEEP) == HIGH) {
-    Serial.println("Going to sleep");
-    delay(100);
-    if (digitalRead(PIN_SLEEP) == HIGH) {
-       esp_deep_sleep_start();
-    }
-  }*/
 }

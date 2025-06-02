@@ -58,6 +58,7 @@ class Sip
 	void        Init(const char *SipIp, int SipPort, const char *MyIp, int MyPort, const char *SipUser, const char *SipPassWd, int MaxDialSec = 10);
     bool        Dial(const char *DialNr, const char *DialDesc, const char *sdpBody, size_t   sdpLen);
 	void		Processing(char *pBuf, size_t lBuf);
+    bool        Register(const char* pIn = 0);
     bool        IsBusy() { return iRingTime != 0; }
     bool        IsInCall() const { return isInCall; }
     uint16_t    GetRemoteRtpPort() const { return remoteRtpPort; }
@@ -80,6 +81,7 @@ class Sip
     size_t      sdpLen;
 
     uint32_t    callid;
+    uint32_t    regid;
     uint32_t    tagid;
     uint32_t    branchid;
     uint16_t    remoteRtpPort = 0;
@@ -104,6 +106,7 @@ class Sip
     void        Bye(int cseq);
     void        Ok(const char *pIn);
     void        Invite(const char *pIn = 0);
+    void        AnswerInvite(const char* inviteMsg);
 
     uint32_t    Millis();
     uint32_t    Random();
