@@ -4,7 +4,7 @@
  * Licensed under the GNU General Public License v3.0
  * (c) 2025 Hugo Schroeder
 
- * This serves to handle all the elements needed to send an RTP stream and play it back
+ * This serves to handle all the elements needed to record an RTP stream and stream it out
  */
 #pragma once
 #include <Arduino.h>

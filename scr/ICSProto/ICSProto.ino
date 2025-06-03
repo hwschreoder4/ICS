@@ -68,7 +68,7 @@ void loop() {
   userInput.update();
   // Throttle SIP processing so we don't flood
   if (millis() - lastSipTick >= SIP_MS) {
-    sipClient.loop();
+    sipClient.update();
     lastSipTick = millis();
   }
 

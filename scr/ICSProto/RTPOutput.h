@@ -5,8 +5,6 @@
  * (c) 2025 Hugo Schroeder
 
  * This serves to handle all the elements needed to recive an RTP stream and play it back
- * Future clean up to include the ablity to disable the serial logging of underflow easily
-
  */
 
 #pragma once
@@ -35,9 +33,7 @@ public:
     , _i2sOut{}
     {}
 
-bool begin(uint16_t port,
-             int pin_ws, int pin_bck, int pin_data,
-             float volumeLevel = 1.0f) {
+bool begin(uint16_t port, int pin_ws, int pin_bck, int pin_data, float volumeLevel = 1.0f) {
     Serial.printf("[RTPOutput] begin(): port=%u ws=%d bck=%d data=%d vol=%.2f\n", port, pin_ws, pin_bck, pin_data, volumeLevel);
     // Begin UDP stream
     if (!_udpStream.begin(port)) {
@@ -75,7 +71,7 @@ bool begin(uint16_t port,
     Serial.println("[RTPOutput] FormatConverter begin OK");
     // Pre-fill jitter buffer
     while (_jitterBuffer.available() < MONO_FRAME_BYTES *5) {
-      _bufCopy.copy(); // pump in 5×20 ms = 240 ms of audio
+      _bufCopy.copy(); // pump in 5×20 ms = 200 ms of audio
       delay(1);
     }
     Serial.println("[RTPOutput]Buffer warmed up—starting playback");
@@ -111,7 +107,6 @@ private:
   I2SStream             _i2sOut;
 
   static const size_t MONO_FRAME_BYTES   = 160 * 2;
-  static const size_t STEREO_FRAME_BYTES = 160 * 2 * 2;
   static const size_t REFILL_THRESHOLD   = MONO_FRAME_BYTES * 1;
   static const size_t JITTER_BUF_SIZE    = 160 * 2 * 2 * 30;
 

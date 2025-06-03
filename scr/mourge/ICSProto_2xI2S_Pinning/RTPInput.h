@@ -113,6 +113,6 @@ private:
   StreamCopy*                       _sender;
 
 
-  AudioInfo _pcmIn{16000, 1, 32};
+  AudioInfo _pcmIn{16000, 1, 16};
   AudioInfo _pcmNet{8000, 1, 16};
 };

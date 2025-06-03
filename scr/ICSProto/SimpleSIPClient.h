@@ -62,7 +62,7 @@ public:
     return true;
   }
 
-  void loop() {
+  void update() {
     // pump incoming SIP packets through the SIP state machine
     _sip.Processing(inBuf, sizeof(inBuf));
 
@@ -76,7 +76,6 @@ public:
       }
       _lastRegisterMs = now;
     }
-
   }
 
   bool callConference(uint16_t conferenceExt, uint16_t localRTPPort) {
@@ -91,7 +90,7 @@ public:
       "a=rtpmap:0 PCMU/8000\r\n";
       "a=ptime:20\r\n";
 
-    // this will drive the 401/ack/invite dance under the covers
+    // this will drive the 401/ack/invite dance
   return _sip.Dial(
     _extBuf,
     "ESP32 Call",  
