@@ -7,10 +7,8 @@ class OffsetFilter : public Filter<int32_t> {
     virtual ~OffsetFilter() = default;
 
     virtual int32_t process(int32_t in) override {
-    return in + offset;  // Orginal Filter
-    //return in >> 8;   // Did not work
+    return in + offset;
     }
-
 
 protected:
   int32_t offset;

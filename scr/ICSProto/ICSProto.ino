@@ -1,9 +1,8 @@
 #include <Arduino.h>
-#include "SimpleSIPClient.h"   // wrapper around ArduinoSIP :contentReference[oaicite:1]{index=1}
+#include "SimpleSIPClient.h" 
 #include "RTPInput.h"
 #include "RTPOutput.h"
 #include "UserInput.h"
-#include "esp_sleep.h"
 
 // Wi-Fi credentials (used inside SimpleSIPClient::begin)
 const char* WIFI_SSID     = "Good's Wifi 2.4";
@@ -69,7 +68,7 @@ void loop() {
   userInput.update();
   // Throttle SIP processing so we don't flood
   if (millis() - lastSipTick >= SIP_MS) {
-    sipClient.loop();
+    sipClient.update();
     lastSipTick = millis();
   }
 
